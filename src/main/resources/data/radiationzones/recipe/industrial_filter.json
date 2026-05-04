@@ -1,0 +1,22 @@
+{
+  "neoforge:conditions": [
+    { "type": "radiationzones:recipe_enabled", "name": "industrial_filter" }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "CRC",
+    "BFB",
+    "CRC"
+  ],
+  "key": {
+    "C": { "item": "minecraft:copper_ingot" },
+    "R": { "item": "minecraft:redstone" },
+    "B": { "item": "minecraft:blaze_powder" },
+    "F": { "item": "radiationzones:basic_filter" }
+  },
+  "result": {
+    "id": "radiationzones:industrial_filter",
+    "count": 1
+  }
+}
