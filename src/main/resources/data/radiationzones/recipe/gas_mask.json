@@ -1,0 +1,21 @@
+{
+  "neoforge:conditions": [
+    { "type": "radiationzones:recipe_enabled", "name": "gas_mask" }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "ILI",
+    "GLG",
+    " I "
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "L": { "item": "minecraft:leather" },
+    "G": { "item": "minecraft:glass_pane" }
+  },
+  "result": {
+    "id": "radiationzones:gas_mask",
+    "count": 1
+  }
+}
