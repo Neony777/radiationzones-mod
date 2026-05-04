@@ -1,0 +1,22 @@
+{
+  "neoforge:conditions": [
+    { "type": "radiationzones:recipe_enabled", "name": "basic_filter" }
+  ],
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "IPI",
+    "CSC",
+    "IPI"
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_nugget" },
+    "P": { "item": "minecraft:paper" },
+    "C": { "item": "minecraft:charcoal" },
+    "S": { "item": "minecraft:string" }
+  },
+  "result": {
+    "id": "radiationzones:basic_filter",
+    "count": 1
+  }
+}
