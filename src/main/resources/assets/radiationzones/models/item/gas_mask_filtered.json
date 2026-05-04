@@ -1,0 +1,7 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "radiationzones:item/gas_mask_filtered",
+    "layer1": "radiationzones:item/gas_mask_filtered_canister"
+  }
+}
