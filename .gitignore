@@ -1,0 +1,30 @@
+# Gradle / build output
+.gradle/
+build/
+out/
+.gradle-local/
+
+# Generated mod metadata (regenerated each build)
+src/generated/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.classpath
+.project
+.settings/
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local published maven repo
+repo/
+
+# Run directory used by NeoForge dev runs
+run/
+runs/
