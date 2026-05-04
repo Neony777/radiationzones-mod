@@ -1,0 +1,12 @@
+{
+  "geiger_click": {
+    "category": "players",
+    "subtitle": "subtitles.radiationzones.geiger_click",
+    "sounds": [
+      { "name": "radiationzones:geiger_click",   "stream": false },
+      { "name": "radiationzones:geiger_click_1", "stream": false },
+      { "name": "radiationzones:geiger_click_2", "stream": false },
+      { "name": "radiationzones:geiger_click_3", "stream": false }
+    ]
+  }
+}
