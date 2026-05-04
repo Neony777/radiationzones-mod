@@ -1,0 +1,12 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "radiationzones:item/gas_mask"
+  },
+  "overrides": [
+    {
+      "predicate": { "radiationzones:filter_installed": 1 },
+      "model": "radiationzones:item/gas_mask_filtered"
+    }
+  ]
+}
