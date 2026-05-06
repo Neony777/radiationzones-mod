@@ -60,7 +60,20 @@ A safe zone behaves like Minecraft's world border but for radiation: anyone **ou
 
 Safe zones support both **square** (cuboid) and **circle** (vertical cylinder, full world height) shapes. Drift and shrink/expand survive server restarts — the system uses wall-clock time deltas, not tick counts. When a safe zone shrinks below 1×1 it's left in place at zero size, meaning the entire dimension is irradiated (admin "scorched earth" end state). To clean up a fully decayed safe zone, give it a level decay so its level eventually reaches 0 and it removes itself, or use `/radiationzone remove`.
 
-Multiple overlapping safe zones combine via **union**: a player is irradiated by safe-zone logic only when standing outside *every* OUTSIDE zone in that dimension.
+Multiple safe zones are **independent**. Each one irradiates whenever the player is outside its own bounds. When several safe zones apply at once (the player is outside more than one), the **highest level** wins.
+
+This makes nested concentric rings work cleanly:
+
+```
+/radzone createsafe ring1 square 1000 1
+/radzone createsafe ring2 square 1500 2
+/radzone createsafe ring3 square 2000 3
+```
+
+* Inside the 1000-block ring → completely safe.
+* Between 1000 and 1500 → outside ring1, inside ring2/ring3 → level 1 damage.
+* Between 1500 and 2000 → outside ring1+ring2, inside ring3 → level 2 damage.
+* Outside the 2000-block ring → outside all three → level 3 damage.
 
 ### Dynamic zones (spread, decay, level decay)
 
