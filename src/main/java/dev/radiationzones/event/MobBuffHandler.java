@@ -37,6 +37,11 @@ public class MobBuffHandler {
         int interval = Math.max(1, RadiationConfig.mobBuffCheckIntervalTicks());
         if (entity.tickCount % interval != 0) return;
 
+        // Width of the refresh window — used both for re-applying effects and for
+        // recognizing that a lingering effect on a mob is almost certainly ours
+        // (so we can clean it up safely on zone exit / threshold drop).
+        int effectDuration = interval + 40;
+
         RadiationZone zone = ZoneManager.zoneAt(mob);
         if (zone == null) {
             removeModifier(mob, Attributes.MAX_HEALTH, HEALTH_ID);
@@ -44,6 +49,9 @@ public class MobBuffHandler {
             removeModifier(mob, Attributes.ATTACK_DAMAGE, ATTACK_ID);
             removeModifier(mob, Attributes.SCALE, SCALE_ID);
             removeModifier(mob, Attributes.KNOCKBACK_RESISTANCE, KNOCKBACK_ID);
+            removeOurEffect(mob, MobEffects.GLOWING, effectDuration);
+            removeOurEffect(mob, MobEffects.DAMAGE_BOOST, effectDuration);
+            removeOurEffect(mob, MobEffects.DAMAGE_RESISTANCE, effectDuration);
             return;
         }
 
@@ -60,18 +68,25 @@ public class MobBuffHandler {
                 RadiationConfig.mobKnockbackResistance(level), AttributeModifier.Operation.ADD_VALUE);
 
         // Refresh status effects with a duration that comfortably outlives the next check.
-        int effectDuration = interval + 40;
+        // If the zone's level dropped below a threshold (or threshold disabled), clean up
+        // any lingering effect we previously applied so it doesn't hang on for ~12s.
         int glowMin = RadiationConfig.mobGlowingMinLevel();
         if (glowMin > 0 && level >= glowMin) {
             applyEffect(mob, MobEffects.GLOWING, effectDuration, 0);
+        } else {
+            removeOurEffect(mob, MobEffects.GLOWING, effectDuration);
         }
         int strMin = RadiationConfig.mobStrengthMinLevel();
         if (strMin > 0 && level >= strMin) {
             applyEffect(mob, MobEffects.DAMAGE_BOOST, effectDuration, RadiationConfig.mobStrengthAmplifier());
+        } else {
+            removeOurEffect(mob, MobEffects.DAMAGE_BOOST, effectDuration);
         }
         int resMin = RadiationConfig.mobResistanceMinLevel();
         if (resMin > 0 && level >= resMin) {
             applyEffect(mob, MobEffects.DAMAGE_RESISTANCE, effectDuration, RadiationConfig.mobResistanceAmplifier());
+        } else {
+            removeOurEffect(mob, MobEffects.DAMAGE_RESISTANCE, effectDuration);
         }
 
         // Mark buffed mobs as persistent so they don't despawn and keep haunting the area.
@@ -108,5 +123,18 @@ public class MobBuffHandler {
         MobEffectInstance current = mob.getEffect(effect);
         if (current != null && current.getAmplifier() == amplifier && current.getDuration() > durationTicks / 2) return;
         mob.addEffect(new MobEffectInstance(effect, durationTicks, amplifier, true, false, false));
+    }
+
+    /**
+     * Remove an effect from the mob only when its remaining duration is short enough
+     * that it's almost certainly one we applied via {@link #applyEffect}. This avoids
+     * stripping unrelated long-lived potions a player might have applied.
+     */
+    private static void removeOurEffect(Mob mob, Holder<MobEffect> effect, int ourMaxDurationTicks) {
+        MobEffectInstance current = mob.getEffect(effect);
+        if (current == null) return;
+        if (current.getDuration() <= ourMaxDurationTicks) {
+            mob.removeEffect(effect);
+        }
     }
 }
