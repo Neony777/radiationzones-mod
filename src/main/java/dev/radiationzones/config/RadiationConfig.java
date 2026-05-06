@@ -14,6 +14,8 @@ public final class RadiationConfig {
     public static final ModConfigSpec.ConfigValue<List<? extends Double>> MOB_HEALTH_MULT;
     public static final ModConfigSpec.ConfigValue<List<? extends Double>> MOB_SPEED_MULT;
     public static final ModConfigSpec.ConfigValue<List<? extends Double>> MOB_ATTACK_MULT;
+    public static final ModConfigSpec.ConfigValue<List<? extends Double>> MOB_SCALE_BONUS;
+    public static final ModConfigSpec.ConfigValue<List<? extends Double>> MOB_KNOCKBACK_RESIST;
 
     // --- general ---
     public static final ModConfigSpec.IntValue MAX_LEVEL;
@@ -31,6 +33,12 @@ public final class RadiationConfig {
     public static final ModConfigSpec.BooleanValue MOB_BUFFS_ENABLED;
     public static final ModConfigSpec.BooleanValue AFFECT_PASSIVE_MOBS;
     public static final ModConfigSpec.IntValue MOB_BUFF_CHECK_INTERVAL_TICKS;
+    public static final ModConfigSpec.BooleanValue MOB_PERSISTENT;
+    public static final ModConfigSpec.IntValue MOB_GLOWING_MIN_LEVEL;
+    public static final ModConfigSpec.IntValue MOB_STRENGTH_MIN_LEVEL;
+    public static final ModConfigSpec.IntValue MOB_RESISTANCE_MIN_LEVEL;
+    public static final ModConfigSpec.IntValue MOB_STRENGTH_AMPLIFIER;
+    public static final ModConfigSpec.IntValue MOB_RESISTANCE_AMPLIFIER;
 
     // --- particles ---
     public static final ModConfigSpec.BooleanValue PARTICLES_ENABLED;
@@ -107,6 +115,20 @@ public final class RadiationConfig {
                         () -> 0.5,
                         o -> o instanceof Double d && d >= 0.0);
 
+        MOB_SCALE_BONUS = builder
+                .comment("Bonus added to mob scale attribute (per level). 0.05 = +5% size, 0.6 = +60% size. Vanilla 1.0 = normal size.")
+                .defineList("mobScaleBonus",
+                        List.of(0.05, 0.10, 0.20, 0.35, 0.60),
+                        () -> 0.10,
+                        o -> o instanceof Double d && d >= -0.5 && d <= 5.0);
+
+        MOB_KNOCKBACK_RESIST = builder
+                .comment("Knockback resistance added to mobs (per level). 0.0 = none, 1.0 = immovable. Higher = harder to knock back, mutated mobs feel heavier.")
+                .defineList("mobKnockbackResistance",
+                        List.of(0.10, 0.20, 0.40, 0.60, 0.80),
+                        () -> 0.20,
+                        o -> o instanceof Double d && d >= 0.0 && d <= 1.0);
+
         builder.pop();
 
         builder.comment("General behavior toggles.").push("general");
@@ -149,6 +171,24 @@ public final class RadiationConfig {
         MOB_BUFF_CHECK_INTERVAL_TICKS = builder
                 .comment("Ticks between mob buff (re)checks. Lower = more responsive but more CPU.")
                 .defineInRange("checkIntervalTicks", 20, 5, 200);
+        MOB_PERSISTENT = builder
+                .comment("If true, mobs that have been buffed by a radiation zone are flagged as persistent and will not despawn naturally — they keep haunting the area.")
+                .define("persistent", true);
+        MOB_GLOWING_MIN_LEVEL = builder
+                .comment("Minimum zone level at which buffed mobs gain the Glowing effect (so players can see mutated mobs through walls). 0 disables.")
+                .defineInRange("glowingMinLevel", 2, 0, 20);
+        MOB_STRENGTH_MIN_LEVEL = builder
+                .comment("Minimum zone level at which buffed mobs gain a vanilla Strength effect on top of attack scaling. 0 disables.")
+                .defineInRange("strengthMinLevel", 3, 0, 20);
+        MOB_STRENGTH_AMPLIFIER = builder
+                .comment("Amplifier of the Strength effect (0 = Strength I, 1 = Strength II, ...).")
+                .defineInRange("strengthAmplifier", 0, 0, 9);
+        MOB_RESISTANCE_MIN_LEVEL = builder
+                .comment("Minimum zone level at which buffed mobs gain Resistance (damage reduction). 0 disables.")
+                .defineInRange("resistanceMinLevel", 4, 0, 20);
+        MOB_RESISTANCE_AMPLIFIER = builder
+                .comment("Amplifier of the Resistance effect (0 = Resistance I = -20% damage, 1 = -40%, ...).")
+                .defineInRange("resistanceAmplifier", 0, 0, 4);
         builder.pop();
 
         builder.comment("Visual ambient particle effect inside radiation zones.").push("particles");
@@ -240,6 +280,14 @@ public final class RadiationConfig {
     public static double mobHealthMult(int level) { return atLevel(MOB_HEALTH_MULT.get(), level, 0.5); }
     public static double mobSpeedMult(int level) { return atLevel(MOB_SPEED_MULT.get(), level, 0.15); }
     public static double mobAttackMult(int level) { return atLevel(MOB_ATTACK_MULT.get(), level, 0.5); }
+    public static double mobScaleBonus(int level) { return atLevel(MOB_SCALE_BONUS.get(), level, 0.10); }
+    public static double mobKnockbackResistance(int level) { return atLevel(MOB_KNOCKBACK_RESIST.get(), level, 0.20); }
+    public static boolean mobsPersistent() { return MOB_PERSISTENT.get(); }
+    public static int mobGlowingMinLevel() { return MOB_GLOWING_MIN_LEVEL.get(); }
+    public static int mobStrengthMinLevel() { return MOB_STRENGTH_MIN_LEVEL.get(); }
+    public static int mobStrengthAmplifier() { return MOB_STRENGTH_AMPLIFIER.get(); }
+    public static int mobResistanceMinLevel() { return MOB_RESISTANCE_MIN_LEVEL.get(); }
+    public static int mobResistanceAmplifier() { return MOB_RESISTANCE_AMPLIFIER.get(); }
 
     public static boolean creativeImmune() { return CREATIVE_IMMUNE.get(); }
     public static boolean spectatorImmune() { return SPECTATOR_IMMUNE.get(); }
