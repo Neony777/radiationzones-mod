@@ -50,6 +50,10 @@ public class PlayerRadiationHandler {
         int ticksSinceDamage;
         int ticksSinceGeiger;
         String currentZoneName;
+        /** Highest Lugol's duration (in ticks) we have seen for the current effect instance.
+         *  Used as the boss-bar denominator so the bar reflects the granted duration,
+         *  not the config default. Reset to 0 when the player loses the effect. */
+        int lugolsTotalTicks;
     }
 
     private final Map<UUID, State> states = new HashMap<>();
@@ -115,8 +119,12 @@ public class PlayerRadiationHandler {
         if (protectedByLugols) {
             int lugolsRemainingTicks = player.getEffect(ModEffects.LUGOLS_IODINE).getDuration();
             int lugolsRemainingSec = (lugolsRemainingTicks + 19) / 20;
-            int lugolsTotalTicks = Math.max(1,
-                    RadiationConfig.LUGOLS_DEFAULT_DURATION_SECONDS.get() * 20);
+            // Track the granted total: the highest remaining we've ever seen for this
+            // effect instance is effectively the duration it was applied with.
+            if (lugolsRemainingTicks > state.lugolsTotalTicks) {
+                state.lugolsTotalTicks = lugolsRemainingTicks;
+            }
+            int lugolsTotalTicks = Math.max(1, state.lugolsTotalTicks);
             state.bar.setName(Component.translatable(
                     zone.mode() == ZoneMode.OUTSIDE
                             ? "bossbar.radiationzones.outside_protected"
@@ -127,6 +135,8 @@ public class PlayerRadiationHandler {
             state.ticksSinceDamage = 0;
             return;
         }
+        // Effect lapsed — reset the cached total so the next dose re-anchors the bar.
+        state.lugolsTotalTicks = 0;
 
         if (remainingTicks > 0) {
             state.bar.setName(Component.translatable(
