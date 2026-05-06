@@ -13,8 +13,8 @@ Grab the latest `.jar` from the [GitHub Releases page](https://github.com/Neony7
 - **Radiation Wand** — admin tool. Left-click block = pos1, right-click block = pos2.
 - **Cuboid radiation zones** with level 1–5 (configurable up to 20).
 - **Per-player boss bar** showing zone level and grace-period countdown; turns red and starts inflicting radiation damage when the timer runs out.
-- **Hostile mobs are buffed** in zones — extra max health, movement speed, attack damage, scaled by zone level.
-- **Lugol's Potion** — drinkable item that grants temporary immunity to radiation. Craftable in survival, or hand it out via `/lugols give`.
+- **Hostile mobs are mutated** in zones — extra max health, movement speed, attack damage, **larger size**, **knockback resistance**, plus **Glowing** (Lv2+), **Strength** (Lv3+) and **Resistance** (Lv4+) effects. Buffed mobs are flagged persistent and won't despawn, so they keep haunting the area.
+- **Lugol's Iodine** — temporary immunity to radiation. Craftable in survival, hand the *item* out with `/lugols give <player> [count] [duration]`, or skip the item entirely and apply the effect directly with `/lugols apply <player> <duration>`.
 - **Gas Mask** — craftable head-slot helmet with three swappable filter tiers (Basic / Industrial / Hazmat). Right-click to install a filter, sneak + right-click to eject it. While worn in a zone, the filter takes the radiation hit instead of the player; the mask itself wears down very slowly. Lugol's still wins if both are active.
 - All zones persist per-world to `<world>/data/radiationzones.json`.
 - All values tunable in `config/radiationzones-common.toml`.
@@ -34,7 +34,8 @@ Grab the latest `.jar` from the [GitHub Releases page](https://github.com/Neony7
 | `/radiationzone setmaxradius <name> <blocks>` | Cap how far the zone can spread from its original bounds (0 = unlimited). |
 | `/radiationzone setdrift <name> <dx> <dy> <dz>` | Drift the bounds through the world at `dx,dy,dz` blocks/minute on each axis. |
 | `/radiationzone setmode <name> <inside\|outside>` | Flip an existing zone between hazard (inside) and safe-bubble (outside) modes. |
-| `/lugols give <player> [count]` | Gives Lugol's Potion(s). |
+| `/lugols give <player> [count] [durationSeconds]` | Gives Lugol's Iodine potion(s). The optional `durationSeconds` is baked into the bottle so drinking it grants exactly that duration (defaults to the config value). |
+| `/lugols apply <player> <durationSeconds> [amplifier]` | Applies Lugol's Iodine directly to a player for the given number of seconds — no item needed. Defines exactly how long they can survive in a zone. |
 
 ### Safe zones (world-border style)
 
@@ -132,7 +133,11 @@ It exposes everything tunable:
 - **lugols.\*** — `defaultDurationSeconds`, `amplifier` (potion strength tier),
   `showIcon` (whether the effect shows in HUD).
 - **mobs.\*** — `enabled` (master mob-buff toggle), `affectPassiveMobs`
-  (also buff cows, villagers, ...), `checkIntervalTicks`.
+  (also buff cows, villagers, ...), `checkIntervalTicks`, `persistent`
+  (buffed mobs don't despawn), `glowingMinLevel` / `strengthMinLevel`
+  / `resistanceMinLevel` (zone level at which each vanilla effect kicks in,
+  0 = disabled), and per-level `mobScaleBonus` / `mobKnockbackResistance`
+  under `[levels]`.
 - **particles.\*** — `enabled`, per-level `particlesPerTick`, `radius`, `previewRadius`
   (distance from which approaching players see hint particles).
 - **geiger.\*** — `enabled`, per-level `intervalTicks`, `volume`, and `soundId` (any
@@ -198,8 +203,12 @@ The config exposes per-level lists (index 0 = level 1) for:
 - `gracePeriodSeconds` — seconds inside the zone before damage starts.
 - `damageAmount` — damage in half-hearts per application.
 - `damageIntervalTicks` — ticks between damage applications.
-- `mobHealthMultiplier`, `mobSpeedMultiplier`, `mobAttackMultiplier` — buffs added to hostile mobs.
-- `lugols.defaultDurationSeconds` — how long Lugol's Potion protects you.
+- `mobHealthMultiplier`, `mobSpeedMultiplier`, `mobAttackMultiplier`,
+  `mobScaleBonus`, `mobKnockbackResistance` — buffs added to mobs in zones.
+- `lugols.defaultDurationSeconds` — how long Lugol's Iodine protects you when no
+  per-stack duration is set (i.e. survival-crafted potions). Use
+  `/lugols give ... <durationSeconds>` or `/lugols apply ... <durationSeconds>`
+  to override on a per-give basis.
 
 Defaults (levels 1 → 5):
 
