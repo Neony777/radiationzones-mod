@@ -69,46 +69,33 @@ public final class ZoneManager {
 
     public static RadiationZone zoneAt(ResourceKey<Level> dim, double x, double y, double z) {
         // INSIDE zones are independent: irradiate when the point is inside the bounds.
-        // OUTSIDE zones (safe zones) UNION their safe areas: a player is irradiated by
-        // OUTSIDE zones only when standing outside ALL OUTSIDE zones in the dimension.
-        RadiationZone bestInside = null;
-        RadiationZone bestOutside = null;
-        boolean insideAnySafe = false;
-        boolean anyOutsideInDim = false;
+        // OUTSIDE zones (safe zones) are also independent: each safe zone irradiates
+        // when the player is outside ITS bounds. With nested rings (e.g. 1000@L1,
+        // 1500@L2, 2000@L3), a player between rings 1 and 2 is outside the L1 zone
+        // (so takes L1) but inside L2 and L3 (safe from those). Effective level is
+        // the highest among all zones whose hazard condition currently applies.
+        RadiationZone best = null;
         for (RadiationZone zone : ZONES.values()) {
             if (!zone.dimension().equals(dim)) continue;
+            boolean hit;
             if (zone.mode() == ZoneMode.INSIDE) {
-                if (zone.contains(dim, x, y, z)) {
-                    if (bestInside == null || zone.level() > bestInside.level()) bestInside = zone;
-                }
+                hit = zone.contains(dim, x, y, z);
             } else {
-                anyOutsideInDim = true;
-                if (zone.containsBounds(x, y, z)) insideAnySafe = true;
-                if (bestOutside == null || zone.level() > bestOutside.level()) bestOutside = zone;
+                hit = !zone.containsBounds(x, y, z);
             }
+            if (hit && (best == null || zone.level() > best.level())) best = zone;
         }
-        RadiationZone outsideHit = (anyOutsideInDim && !insideAnySafe) ? bestOutside : null;
-        if (bestInside != null && outsideHit != null) {
-            return bestInside.level() >= outsideHit.level() ? bestInside : outsideHit;
-        }
-        return bestInside != null ? bestInside : outsideHit;
+        return best;
     }
 
     public static List<RadiationZone> zonesAt(ResourceKey<Level> dim, double x, double y, double z) {
         List<RadiationZone> out = new ArrayList<>();
-        boolean insideAnySafe = false;
-        for (RadiationZone zone : ZONES.values()) {
-            if (zone.mode() == ZoneMode.OUTSIDE && zone.dimension().equals(dim)
-                    && zone.containsBounds(x, y, z)) {
-                insideAnySafe = true; break;
-            }
-        }
         for (RadiationZone zone : ZONES.values()) {
             if (!zone.dimension().equals(dim)) continue;
             if (zone.mode() == ZoneMode.INSIDE) {
                 if (zone.contains(dim, x, y, z)) out.add(zone);
-            } else if (!insideAnySafe) {
-                out.add(zone);
+            } else {
+                if (!zone.containsBounds(x, y, z)) out.add(zone);
             }
         }
         return out;
