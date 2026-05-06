@@ -6,7 +6,9 @@ import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import dev.radiationzones.component.ModDataComponents;
 import dev.radiationzones.config.RadiationConfig;
+import dev.radiationzones.effect.ModEffects;
 import dev.radiationzones.item.ModItems;
 import dev.radiationzones.zone.RadiationZone;
 import dev.radiationzones.zone.WandSelections;
@@ -22,6 +24,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
@@ -153,7 +156,42 @@ public final class ModCommands {
                                                 ctx.getSource(),
                                                 EntityArgument.getPlayer(ctx, "player"),
                                                 RadiationConfig.LUGOLS_DEFAULT_DURATION_SECONDS.get(),
-                                                IntegerArgumentType.getInteger(ctx, "count")))))));
+                                                IntegerArgumentType.getInteger(ctx, "count")))
+                                        .then(Commands.argument("durationSeconds", IntegerArgumentType.integer(1, 86400))
+                                                .executes(ctx -> givePotion(
+                                                        ctx.getSource(),
+                                                        EntityArgument.getPlayer(ctx, "player"),
+                                                        IntegerArgumentType.getInteger(ctx, "durationSeconds"),
+                                                        IntegerArgumentType.getInteger(ctx, "count")))))))
+                .then(Commands.literal("apply")
+                        .then(Commands.argument("player", EntityArgument.player())
+                                .then(Commands.argument("durationSeconds", IntegerArgumentType.integer(1, 86400))
+                                        .executes(ctx -> applyPotion(
+                                                ctx.getSource(),
+                                                EntityArgument.getPlayer(ctx, "player"),
+                                                IntegerArgumentType.getInteger(ctx, "durationSeconds"),
+                                                RadiationConfig.lugolsAmplifier()))
+                                        .then(Commands.argument("amplifier", IntegerArgumentType.integer(0, 9))
+                                                .executes(ctx -> applyPotion(
+                                                        ctx.getSource(),
+                                                        EntityArgument.getPlayer(ctx, "player"),
+                                                        IntegerArgumentType.getInteger(ctx, "durationSeconds"),
+                                                        IntegerArgumentType.getInteger(ctx, "amplifier"))))))));
+    }
+
+    private static int applyPotion(CommandSourceStack source, ServerPlayer target, int durationSeconds, int amplifier) {
+        boolean showIcon = RadiationConfig.lugolsShowIcon();
+        target.addEffect(new MobEffectInstance(
+                ModEffects.LUGOLS_IODINE,
+                durationSeconds * 20,
+                amplifier,
+                false,
+                showIcon,
+                showIcon));
+        source.sendSuccess(() ->
+                Component.translatable("command.radiationzones.applied_potion", target.getName(), durationSeconds)
+                        .withStyle(ChatFormatting.GREEN), true);
+        return Command.SINGLE_SUCCESS;
     }
 
     private static int giveWand(CommandSourceStack source, ServerPlayer target) {
@@ -167,6 +205,9 @@ public final class ModCommands {
 
     private static int givePotion(CommandSourceStack source, ServerPlayer target, int durationSeconds, int count) {
         ItemStack stack = new ItemStack(ModItems.LUGOLS_POTION.get(), count);
+        if (durationSeconds != RadiationConfig.LUGOLS_DEFAULT_DURATION_SECONDS.get()) {
+            stack.set(ModDataComponents.LUGOLS_DURATION.get(), durationSeconds);
+        }
         if (!target.getInventory().add(stack)) target.drop(stack, false);
         source.sendSuccess(() ->
                 Component.translatable("command.radiationzones.gave_potion", target.getName())
