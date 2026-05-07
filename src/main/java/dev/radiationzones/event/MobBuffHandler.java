@@ -17,20 +17,29 @@ import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Enemy;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.tick.EntityTickEvent;
 import org.joml.Vector3f;
 
 public class MobBuffHandler {
-    private static final ResourceLocation HEALTH_ID   = ResourceLocation.fromNamespaceAndPath("radiationzones", "rad_health");
-    private static final ResourceLocation SPEED_ID    = ResourceLocation.fromNamespaceAndPath("radiationzones", "rad_speed");
-    private static final ResourceLocation ATTACK_ID   = ResourceLocation.fromNamespaceAndPath("radiationzones", "rad_attack");
-    private static final ResourceLocation SCALE_ID    = ResourceLocation.fromNamespaceAndPath("radiationzones", "rad_scale");
+    private static final ResourceLocation HEALTH_ID    = ResourceLocation.fromNamespaceAndPath("radiationzones", "rad_health");
+    private static final ResourceLocation SPEED_ID     = ResourceLocation.fromNamespaceAndPath("radiationzones", "rad_speed");
+    private static final ResourceLocation ATTACK_ID    = ResourceLocation.fromNamespaceAndPath("radiationzones", "rad_attack");
+    private static final ResourceLocation SCALE_ID     = ResourceLocation.fromNamespaceAndPath("radiationzones", "rad_scale");
     private static final ResourceLocation KNOCKBACK_ID = ResourceLocation.fromNamespaceAndPath("radiationzones", "rad_knockback");
 
-    // Bright-green dust colour for the radioactive aura particles
     private static final DustParticleOptions GREEN_DUST =
             new DustParticleOptions(new Vector3f(0.2f, 1.0f, 0.2f), 0.9f);
+
+    // Aura particles run on a separate, faster cadence than the buff check.
+    // Every 8 ticks (~2.5 times/sec) is smooth enough without flooding the
+    // network with per-mob particle packets.
+    private static final int PARTICLE_INTERVAL = 8;
+
+    // Maximum distance from the mob at which a player must be present for us
+    // to bother sending aura particles — beyond this no client could see them.
+    private static final double PARTICLE_PLAYER_RANGE = 48.0;
 
     @SubscribeEvent
     public void onTick(EntityTickEvent.Post e) {
@@ -41,12 +50,21 @@ public class MobBuffHandler {
         boolean hostile = entity instanceof Enemy;
         if (!hostile && !RadiationConfig.affectPassiveMobs()) return;
 
-        // ── Green particle aura (every 5 ticks) ─────────────────────────────
-        // Runs independently of the slower buff-check interval so the visual
-        // effect stays smooth even when the interval is set to a large value.
-        if (entity.tickCount % 5 == 0 && entity.level() instanceof ServerLevel serverLevel) {
-            RadiationZone pZone = ZoneManager.zoneAt(mob);
-            if (pZone != null) {
+        int interval = Math.max(1, RadiationConfig.mobBuffCheckIntervalTicks());
+        boolean doParticle = (entity.tickCount % PARTICLE_INTERVAL == 0);
+        boolean doBuff     = (entity.tickCount % interval == 0);
+
+        // Exit early when neither task is due — avoids the zoneAt() call entirely.
+        if (!doParticle && !doBuff) return;
+
+        // ── Single zone lookup shared by both particle and buff logic ─────────
+        RadiationZone zone = ZoneManager.zoneAt(mob);
+
+        // ── Green aura particles (every 8 ticks, player-proximity-gated) ─────
+        if (doParticle && zone != null && entity.level() instanceof ServerLevel serverLevel) {
+            // Skip if no player is within render distance of this mob — no one
+            // would see the particles and we would just waste bandwidth.
+            if (serverLevel.getNearestPlayer(mob, PARTICLE_PLAYER_RANGE) != null) {
                 double hw = mob.getBbWidth() * 0.5;
                 double px = mob.getX() + (mob.getRandom().nextDouble() * 2 - 1) * hw;
                 double py = mob.getY() + mob.getRandom().nextDouble() * mob.getBbHeight();
@@ -55,33 +73,29 @@ public class MobBuffHandler {
             }
         }
 
-        // ── Attribute & effect management (throttled by configurable interval) ──
-        int interval = Math.max(1, RadiationConfig.mobBuffCheckIntervalTicks());
-        if (entity.tickCount % interval != 0) return;
+        // ── Attribute & effect management (throttled by configurable interval) ─
+        if (!doBuff) return;
 
-        // Width of the refresh window used for effect duration and cleanup detection.
         int effectDuration = interval + 40;
 
-        RadiationZone zone = ZoneManager.zoneAt(mob);
         if (zone == null) {
-            removeModifier(mob, Attributes.MAX_HEALTH,        HEALTH_ID);
-            removeModifier(mob, Attributes.MOVEMENT_SPEED,   SPEED_ID);
-            removeModifier(mob, Attributes.ATTACK_DAMAGE,    ATTACK_ID);
-            removeModifier(mob, Attributes.SCALE,            SCALE_ID);
+            removeModifier(mob, Attributes.MAX_HEALTH,         HEALTH_ID);
+            removeModifier(mob, Attributes.MOVEMENT_SPEED,    SPEED_ID);
+            removeModifier(mob, Attributes.ATTACK_DAMAGE,     ATTACK_ID);
+            removeModifier(mob, Attributes.SCALE,             SCALE_ID);
             removeModifier(mob, Attributes.KNOCKBACK_RESISTANCE, KNOCKBACK_ID);
-            removeOurEffect(mob, MobEffects.DAMAGE_BOOST,     effectDuration);
+            removeOurEffect(mob, MobEffects.DAMAGE_BOOST,      effectDuration);
             removeOurEffect(mob, MobEffects.DAMAGE_RESISTANCE, effectDuration);
             return;
         }
 
         int level = zone.level();
-        applyOrUpdate(mob, Attributes.MAX_HEALTH,        HEALTH_ID,    RadiationConfig.mobHealthMult(level),         AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
-        applyOrUpdate(mob, Attributes.MOVEMENT_SPEED,   SPEED_ID,     RadiationConfig.mobSpeedMult(level),          AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
-        applyOrUpdate(mob, Attributes.ATTACK_DAMAGE,    ATTACK_ID,    RadiationConfig.mobAttackMult(level),         AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
-        applyOrUpdate(mob, Attributes.SCALE,            SCALE_ID,     RadiationConfig.mobScaleBonus(level),         AttributeModifier.Operation.ADD_VALUE);
+        applyOrUpdate(mob, Attributes.MAX_HEALTH,         HEALTH_ID,     RadiationConfig.mobHealthMult(level),         AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
+        applyOrUpdate(mob, Attributes.MOVEMENT_SPEED,    SPEED_ID,      RadiationConfig.mobSpeedMult(level),           AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
+        applyOrUpdate(mob, Attributes.ATTACK_DAMAGE,     ATTACK_ID,     RadiationConfig.mobAttackMult(level),          AttributeModifier.Operation.ADD_MULTIPLIED_BASE);
+        applyOrUpdate(mob, Attributes.SCALE,             SCALE_ID,      RadiationConfig.mobScaleBonus(level),          AttributeModifier.Operation.ADD_VALUE);
         applyOrUpdate(mob, Attributes.KNOCKBACK_RESISTANCE, KNOCKBACK_ID, RadiationConfig.mobKnockbackResistance(level), AttributeModifier.Operation.ADD_VALUE);
 
-        // Strength — configurable minimum level threshold
         int strMin = RadiationConfig.mobStrengthMinLevel();
         if (strMin > 0 && level >= strMin) {
             applyEffect(mob, MobEffects.DAMAGE_BOOST, effectDuration, RadiationConfig.mobStrengthAmplifier());
@@ -89,7 +103,6 @@ public class MobBuffHandler {
             removeOurEffect(mob, MobEffects.DAMAGE_BOOST, effectDuration);
         }
 
-        // Resistance — configurable minimum level threshold
         int resMin = RadiationConfig.mobResistanceMinLevel();
         if (resMin > 0 && level >= resMin) {
             applyEffect(mob, MobEffects.DAMAGE_RESISTANCE, effectDuration, RadiationConfig.mobResistanceAmplifier());
@@ -97,18 +110,37 @@ public class MobBuffHandler {
             removeOurEffect(mob, MobEffects.DAMAGE_RESISTANCE, effectDuration);
         }
 
-        // Mark buffed mobs persistent so they don't despawn and keep haunting the area.
+        // Mark mobs persistent only up to the configured per-zone cap.
+        // Once the cap is reached new mobs can still despawn normally,
+        // keeping the total haunting population from growing without bound.
         if (RadiationConfig.mobsPersistent() && !mob.isPersistenceRequired()) {
-            mob.setPersistenceRequired();
+            if (mob.level() instanceof ServerLevel serverLevel) {
+                int cap = RadiationConfig.mobZoneCap();
+                if (cap <= 0 || countBuffedMobs(serverLevel, zone) < cap) {
+                    mob.setPersistenceRequired();
+                }
+            }
         }
 
-        // Slowly top up health when max health was boosted
         if (mob.getHealth() < mob.getMaxHealth() && mob.tickCount % 100 == 0) {
             mob.heal(1f);
         }
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Counts mobs in the zone's bounding box that already carry our health
+     * attribute modifier, i.e. mobs we have confirmed-buffed. Used to enforce
+     * the per-zone persistent-mob cap without a global counter.
+     */
+    private static int countBuffedMobs(ServerLevel level, RadiationZone zone) {
+        AABB box = AABB.encapsulatingFullBlocks(zone.min(), zone.max());
+        return level.getEntitiesOfClass(Mob.class, box, m -> {
+            AttributeInstance inst = m.getAttribute(Attributes.MAX_HEALTH);
+            return inst != null && inst.getModifier(HEALTH_ID) != null;
+        }).size();
+    }
 
     private static void applyOrUpdate(Mob mob, Holder<Attribute> attr,
                                       ResourceLocation id, double amount,
@@ -133,10 +165,6 @@ public class MobBuffHandler {
         mob.addEffect(new MobEffectInstance(effect, durationTicks, amplifier, true, false, false));
     }
 
-    /**
-     * Remove an effect only when its remaining duration is short enough that it's
-     * almost certainly one we applied — avoids stripping unrelated long-lived potions.
-     */
     private static void removeOurEffect(Mob mob, Holder<MobEffect> effect, int ourMaxDurationTicks) {
         MobEffectInstance current = mob.getEffect(effect);
         if (current == null) return;
