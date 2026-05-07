@@ -39,6 +39,7 @@ public final class RadiationConfig {
     public static final ModConfigSpec.IntValue MOB_RESISTANCE_MIN_LEVEL;
     public static final ModConfigSpec.IntValue MOB_STRENGTH_AMPLIFIER;
     public static final ModConfigSpec.IntValue MOB_RESISTANCE_AMPLIFIER;
+    public static final ModConfigSpec.IntValue MOB_ZONE_CAP;
 
     // --- particles ---
     public static final ModConfigSpec.BooleanValue PARTICLES_ENABLED;
@@ -189,6 +190,11 @@ public final class RadiationConfig {
         MOB_RESISTANCE_AMPLIFIER = builder
                 .comment("Amplifier of the Resistance effect (0 = Resistance I = -20% damage, 1 = -40%, ...).")
                 .defineInRange("resistanceAmplifier", 0, 0, 4);
+        MOB_ZONE_CAP = builder
+                .comment("Maximum number of persistent buffed mobs allowed per radiation zone. "
+                        + "Once the cap is reached, newly buffed mobs remain despawnable so the "
+                        + "population stays bounded and doesn't tank server framerate. 0 = unlimited (not recommended).")
+                .defineInRange("zonePopulationCap", 30, 0, 500);
         builder.pop();
 
         builder.comment("Visual ambient particle effect inside radiation zones.").push("particles");
@@ -283,6 +289,7 @@ public final class RadiationConfig {
     public static double mobScaleBonus(int level) { return atLevel(MOB_SCALE_BONUS.get(), level, 0.10); }
     public static double mobKnockbackResistance(int level) { return atLevel(MOB_KNOCKBACK_RESIST.get(), level, 0.20); }
     public static boolean mobsPersistent() { return MOB_PERSISTENT.get(); }
+    public static int mobZoneCap() { return MOB_ZONE_CAP.get(); }
     public static int mobGlowingMinLevel() { return MOB_GLOWING_MIN_LEVEL.get(); }
     public static int mobStrengthMinLevel() { return MOB_STRENGTH_MIN_LEVEL.get(); }
     public static int mobStrengthAmplifier() { return MOB_STRENGTH_AMPLIFIER.get(); }
